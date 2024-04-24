@@ -4,9 +4,7 @@ description :
 
 choose next word based on
 
-$$
-\operatorname{softmax}_j( P(x_{t+1}=\text{word}_j \ | \ x_t=,x_{t-1}=,\dots,x_{t-\text{memory}+1}= ) )
-$$
+$$ \operatorname{softmax}_j( P(x_{t+1}=\text{word}_j \ | \ x_t=,x_{t-1}=,\dots,x_{t-\text{memory}+1}= ) ) $$
 
 use temperature parameter
 
