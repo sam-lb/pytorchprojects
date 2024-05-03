@@ -154,3 +154,4 @@ cython_debug/
 
 # big datasets
 data/
+*.pth
