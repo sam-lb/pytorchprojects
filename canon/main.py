@@ -15,6 +15,18 @@ pygame.key.set_repeat(100, 50)
 clock = pygame.time.Clock()
 
 
+def scale(x, k):
+    return (
+        x[0] * k,
+        x[1] * k,
+    )
+
+def add(x1, x2):
+    return (
+        x1[0] + x2[0],
+        x1[1] + x2[1],
+    )
+
 def sub(x1, x2):
     return (
         x1[0] - x2[0],
@@ -65,7 +77,7 @@ class Projectile(Entity):
         super().__init__(position, radius, color)
         self.velocity = velocity
 
-    def update(self, acceleration, dt):
+    def update(self, acceleration, dt, obstacles):
         self.velocity = clamp_vector((
             self.velocity[0] + dt * acceleration[0],
             self.velocity[1] + dt * acceleration[1],
@@ -75,12 +87,34 @@ class Projectile(Entity):
             clamp(self.position[1] + dt * self.velocity[1], self.radius, simulation.height - self.radius),
         )
 
+        for obstacle in obstacles:
+            if circle_intersect(self.position, self.radius, obstacle.position, obstacle.radius):
+                self.resolve_collision(obstacle)
+
         if self.position[1] == simulation.height - self.radius:
             # projectile is on the ground
             self.velocity = (
                 self.velocity[0],
                 0,
             )
+
+    def resolve_collision(self, obstacle):
+        c1 = self.position
+        r1 = self.radius
+        c2 = obstacle.position
+        r2 = obstacle.radius
+        v = self.velocity
+
+        A = norm_sq(v)
+        B = 2 * ( v[0] * (c1[0] - c2[0]) + v[1] * (c1[1] - c2[1]) )
+        C = c1[0] * c1[0] + c2[0] * c2[0] + c1[1] * c1[1] + c2[1] * c2[1] - 2 * (c1[0] * c2[0] + c1[1] * c2[1]) - (r1 + r2) * (r1 + r2)
+
+        disc = (B * B - 4 * A * C) ** 0.5
+        denom = 2 * A
+        lambda_ = min((-B + disc) / denom, (-B - disc) / denom)
+        res_vector = scale(v, lambda_)
+        self.position = add(c1, res_vector)
+
 
 
 class Canon(Entity):
@@ -101,9 +135,9 @@ class Canon(Entity):
         )
         self.projectile_history = [self.projectile.position]
 
-    def update(self, projectile_acceleration, dt):
+    def update(self, projectile_acceleration, dt, obstacles):
         if not (self.projectile is None):
-            self.projectile.update(projectile_acceleration, dt)
+            self.projectile.update(projectile_acceleration, dt, obstacles)
             self.projectile_history.append(self.projectile.position)
 
     def draw(self):
@@ -120,8 +154,10 @@ class Canon(Entity):
 
 class Obstacle(Entity):
     
-    def __init__(self, position, radius, color):
+    def __init__(self, position, radius, color, restitution=1):
         super().__init__(position, radius, color)
+        self.restitution = restitution
+
 
 class Target(Entity):
 
@@ -147,7 +183,7 @@ class Simulation:
         self.target.draw()
 
     def update(self):
-        self.canon.update(self.gravity, self.dt)
+        self.canon.update(self.gravity, self.dt, self.obstacles)
         self.draw()
 
     def run(self, screen):
