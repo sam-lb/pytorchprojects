@@ -1,18 +1,35 @@
 import pygame
 from math import sin, cos, pi
+from random import randint
 
 pygame.init()
-WIDTH, HEIGHT = 500, 500
+WIDTH, HEIGHT = 1152, 648
 TITLE = "canon shooter"
 MAX_FPS = 30
 BACKGROUND_COLOR = (255, 255, 255)
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+# screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption(TITLE)
 pygame.key.set_repeat(100, 50)
 clock = pygame.time.Clock()
 
 
+def sub(x1, x2):
+    return (
+        x1[0] - x2[0],
+        x1[1] - x2[1],
+    )
+
+def norm(x):
+    return norm_sq(x) ** 0.5
+
+def norm_sq(x):
+    return x[0] * x[0] + x[1] * x[1]
+
+def circle_intersect(c1, r1, c2, r2):
+    min_separation = r1 + r2
+    return norm_sq(sub(c1, c2)) <= min_separation * min_separation
 
 def clamp(x, lower, upper):
     """ clamp a number between lower and upper. lower <= return value <= upper """
@@ -20,11 +37,11 @@ def clamp(x, lower, upper):
 
 def clamp_vector(x, lower, upper):
     """ clamp the norm of a vector between lower and upper. lower <= norm(return value) <= upper """
-    norm = (x[0] * x[0] + x[1] * x[1]) ** 0.5
-    new_norm = clamp(norm, upper, lower)
+    norm_x = norm(x)
+    new_norm = clamp(norm_x, upper, lower)
     return (
-        x[0] / norm * new_norm,
-        x[1] / norm * new_norm,
+        x[0] / norm_x * new_norm,
+        x[1] / norm_x * new_norm,
     )
 
 
@@ -101,6 +118,11 @@ class Canon(Entity):
             self.projectile.draw()
 
 
+class Obstacle(Entity):
+    
+    def __init__(self, position, radius, color):
+        super().__init__(position, radius, color)
+
 class Target(Entity):
 
     def __init__(self, position, radius, color):
@@ -148,14 +170,35 @@ class Simulation:
                         break
                     elif event.key == pygame.K_SPACE:
                         simulation.canon.fire()
-                elif event.type == pygame.VIDEORESIZE:
-                    self.width, self.height = event.w, event.h
-                    screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+                    elif event.key == pygame.K_LEFT:
+                        simulation.canon.angle += 0.1
+                    elif event.key == pygame.K_RIGHT:
+                        simulation.canon.angle -= 0.1
+                # elif event.type == pygame.VIDEORESIZE:
+                #     self.width, self.height = event.w, event.h
+                #     screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
         pygame.quit()
 
 
+obstacles = []
+OBSTACLE_COUNT = 5
+OBSTACLE_RADIUS = 40
+OBSTACLE_COLOR = (100, 255, 100)
+for i in range(OBSTACLE_COUNT):
+    space_found = False
+    x, y = 0, 0
+    while (not space_found):
+        x = randint(OBSTACLE_RADIUS, WIDTH - OBSTACLE_RADIUS)
+        y = randint(OBSTACLE_RADIUS, HEIGHT - OBSTACLE_RADIUS)
+        for obstacle in obstacles:
+            if circle_intersect((x, y), OBSTACLE_RADIUS, obstacle.position, OBSTACLE_RADIUS):
+                break
+        else:
+            space_found = True
+    obstacles.append(Obstacle((x, y), OBSTACLE_RADIUS, OBSTACLE_COLOR))
+
 canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
-simulation = Simulation(canon, [], target, WIDTH, HEIGHT)
+simulation = Simulation(canon, obstacles, target, WIDTH, HEIGHT)
 
 simulation.run(screen)
