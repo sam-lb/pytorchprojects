@@ -39,6 +39,17 @@ def norm(x):
 def norm_sq(x):
     return x[0] * x[0] + x[1] * x[1]
 
+def dot(x1, x2):
+    return x1[0] * x2[0] + x1[1] * x2[1]
+
+def project(x1, x2):
+    """ project x1 onto x2 """
+    return scale(x2, dot(x1, x2) / norm_sq(x2))
+
+def reflect(x1, x2):
+    """ reflect x1 across x2 """
+    return sub(scale(project(x1, x2), 2), x1)
+
 def circle_intersect(c1, r1, c2, r2):
     min_separation = r1 + r2
     return norm_sq(sub(c1, c2)) <= min_separation * min_separation
