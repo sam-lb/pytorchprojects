@@ -14,6 +14,20 @@ clock = pygame.time.Clock()
 
 
 
+def clamp(x, lower, upper):
+    """ clamp a number between lower and upper. lower <= return value <= upper """
+    return max(lower, min(upper, x))
+
+def clamp_vector(x, lower, upper):
+    """ clamp the norm of a vector between lower and upper. lower <= norm(return value) <= upper """
+    norm = (x[0] * x[0] + x[1] * x[1]) ** 0.5
+    new_norm = clamp(norm, upper, lower)
+    return (
+        x[0] / norm * new_norm,
+        x[1] / norm * new_norm,
+    )
+
+
 class Entity:
 
     def __init__(self, position, radius, color):
@@ -21,8 +35,35 @@ class Entity:
         self.radius = radius
         self.color = color
 
+    def update(self):
+        pass
+
     def draw(self):
         pygame.draw.circle(screen, self.color, self.position, self.radius)
+
+
+class Projectile(Entity):
+
+    def __init__(self, position, radius, color, velocity):
+        super().__init__(position, radius, color)
+        self.velocity = velocity
+
+    def update(self, acceleration, dt):
+        self.velocity = clamp_vector((
+            self.velocity[0] + dt * acceleration[0],
+            self.velocity[1] + dt * acceleration[1],
+        ), 0, 100)
+        self.position = (
+            clamp(self.position[0] + dt * self.velocity[0], self.radius, simulation.width - self.radius),
+            clamp(self.position[1] + dt * self.velocity[1], self.radius, simulation.height - self.radius),
+        )
+
+        if self.position[1] == simulation.height - self.radius:
+            # projectile is on the ground
+            self.velocity = (
+                self.velocity[0],
+                0,
+            )
 
 
 class Canon(Entity):
@@ -32,6 +73,21 @@ class Canon(Entity):
         self.angle = angle
         self.barrel_color = barrel_color
         self.barrel_radius = self.radius / 4
+        self.projectile = None
+        self.propulsion = 100
+        self.projectile_history = []
+
+    def fire(self):
+        self.projectile = Projectile(
+            self.position, self.barrel_radius - 1, (0, 0, 0),
+            (self.propulsion * cos(self.angle), -self.propulsion * sin(self.angle))
+        )
+        self.projectile_history = [self.projectile.position]
+
+    def update(self, projectile_acceleration, dt):
+        if not (self.projectile is None):
+            self.projectile.update(projectile_acceleration, dt)
+            self.projectile_history.append(self.projectile.position)
 
     def draw(self):
         barrel_position = (
@@ -40,6 +96,9 @@ class Canon(Entity):
         )
         pygame.draw.circle(screen, self.barrel_color, barrel_position, self.barrel_radius)
         super().draw()
+        if not (self.projectile is None):
+            pygame.draw.lines(screen, self.projectile.color, False, self.projectile_history)
+            self.projectile.draw()
 
 
 class Target(Entity):
@@ -56,6 +115,8 @@ class Simulation:
         self.target = target
         self.running = False
         self.width, self.height = width, height
+        self.gravity = (0, 15)
+        self.dt = 1 / MAX_FPS
 
     def draw(self):
         self.canon.draw()
@@ -64,6 +125,7 @@ class Simulation:
         self.target.draw()
 
     def update(self):
+        self.canon.update(self.gravity, self.dt)
         self.draw()
 
     def run(self, screen):
@@ -84,6 +146,8 @@ class Simulation:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
                         break
+                    elif event.key == pygame.K_SPACE:
+                        simulation.canon.fire()
                 elif event.type == pygame.VIDEORESIZE:
                     self.width, self.height = event.w, event.h
                     screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
