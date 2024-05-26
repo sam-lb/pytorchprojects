@@ -196,7 +196,7 @@ class Simulation:
         self.target = target
         self.running = False
         self.width, self.height = width, height
-        self.gravity = (0, 15)
+        self.gravity = (0, 35)
         self.dt = 1 / MAX_FPS
 
     def draw(self):
