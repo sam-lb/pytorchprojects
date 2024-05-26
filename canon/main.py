@@ -59,6 +59,12 @@ def reflect(x1, x2):
     res = sub(scale(project(x1, x2), 2), x1)
     return res
 
+def distance(x1, x2):
+    return norm(sub(x1, x2))
+
+def distance_sq(x1, x2):
+    return norm_sq(sub(x1, x2))
+
 def circle_intersect(c1, r1, c2, r2):
     min_separation = r1 + r2
     return norm_sq(sub(c1, c2)) <= min_separation * min_separation
@@ -283,10 +289,26 @@ class Agent:
     def __init__(self, position, radius, color, angle, num_obstacles):
         self.canon = Canon(position, radius, color, angle, (100, 100, 100))
         self.brain = AgentBrain(num_obstacles)
+        self.projectiles_fired = 0
 
     def evaluate_fitness(self, simulation):
-        pass
+        if (self.canon.projectile is None):
+            distance_to_target = distance(simulation.target.position, self.canon.position)
+            target_bonus = 0
+        else:
+            distance_to_target = distance(simulation.target.position, self.canon.projectile.position)
+            if circle_intersect(
+                self.canon.projectile.position, self.canon.projectile.radius,
+                simulation.target.position, simulation.target.radius
+            ):
+                target_bonus = 10_000
+            else:
+                target_bonus = 0
+        
+        projectile_penalty = self.projectiles_fired
 
+        fitness = target_bonus - distance_to_target - projectile_penalty
+        return fitness
 
 
 
@@ -309,7 +331,7 @@ for i in range(OBSTACLE_COUNT):
             if circle_intersect((x, y), OBSTACLE_RADIUS, obstacle.position, OBSTACLE_RADIUS):
                 break
         else:
-            space_found = norm_sq(sub((x, y), (0, HEIGHT))) > 40000 # 200 pixel buffer
+            space_found = distance_sq((x, y), (0, HEIGHT)) > 40000 # 200 pixel buffer
     obstacles.append(Obstacle((x, y), OBSTACLE_RADIUS, OBSTACLE_COLOR))
 
 # canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
