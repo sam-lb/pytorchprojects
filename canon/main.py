@@ -287,7 +287,7 @@ for i in range(OBSTACLE_COUNT):
             if circle_intersect((x, y), OBSTACLE_RADIUS, obstacle.position, OBSTACLE_RADIUS):
                 break
         else:
-            space_found = True
+            space_found = norm_sq(sub((x, y), (0, HEIGHT))) > 40000 # 200 pixel buffer
     obstacles.append(Obstacle((x, y), OBSTACLE_RADIUS, OBSTACLE_COLOR))
 
 # canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
