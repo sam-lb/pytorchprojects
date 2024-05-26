@@ -39,6 +39,10 @@ def norm(x):
 def norm_sq(x):
     return x[0] * x[0] + x[1] * x[1]
 
+def normalize(x):
+    norm_ = norm(x)
+    return 0 if norm_ == 0 else x / norm(x)
+
 def dot(x1, x2):
     return x1[0] * x2[0] + x1[1] * x2[1]
 
@@ -48,7 +52,8 @@ def project(x1, x2):
 
 def reflect(x1, x2):
     """ reflect x1 across x2 """
-    return sub(scale(project(x1, x2), 2), x1)
+    res = sub(scale(project(x1, x2), 2), x1)
+    return res
 
 def circle_intersect(c1, r1, c2, r2):
     min_separation = r1 + r2
@@ -100,7 +105,7 @@ class Projectile(Entity):
 
         for obstacle in obstacles:
             if circle_intersect(self.position, self.radius, obstacle.position, obstacle.radius):
-                self.resolve_collision(obstacle)
+                self.resolve_collision(obstacle, dt)
 
         if self.position[1] == simulation.height - self.radius:
             # projectile is on the ground
@@ -109,13 +114,14 @@ class Projectile(Entity):
                 0,
             )
 
-    def resolve_collision(self, obstacle):
+    def resolve_collision(self, obstacle, dt):
         c1 = self.position
         r1 = self.radius
         c2 = obstacle.position
         r2 = obstacle.radius
         v = self.velocity
 
+        # calculate the center of the projectile at the time of the collision
         A = norm_sq(v)
         B = 2 * ( v[0] * (c1[0] - c2[0]) + v[1] * (c1[1] - c2[1]) )
         C = c1[0] * c1[0] + c2[0] * c2[0] + c1[1] * c1[1] + c2[1] * c2[1] - 2 * (c1[0] * c2[0] + c1[1] * c2[1]) - (r1 + r2) * (r1 + r2)
@@ -124,8 +130,14 @@ class Projectile(Entity):
         denom = 2 * A
         lambda_ = min((-B + disc) / denom, (-B - disc) / denom)
         res_vector = scale(v, lambda_)
-        self.position = add(c1, res_vector)
+        center_at_collision_time = add(c1, res_vector)
 
+        # calculate the new velocity of the projectile after collision
+        reflection_vector = sub(c2, center_at_collision_time)
+        self.velocity = scale(reflect(v, reflection_vector), -obstacle.restitution)
+
+        # move the projectile to where it should be at the end of the timestep
+        self.position = add(center_at_collision_time, scale(self.velocity, abs(lambda_ * dt)))
 
 
 class Canon(Entity):
@@ -228,7 +240,7 @@ class Simulation:
 
 
 obstacles = []
-OBSTACLE_COUNT = 5
+OBSTACLE_COUNT = 15
 OBSTACLE_RADIUS = 40
 OBSTACLE_COLOR = (100, 255, 100)
 for i in range(OBSTACLE_COUNT):
