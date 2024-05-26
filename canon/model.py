@@ -26,3 +26,20 @@ fitness:
 
 
 import torch
+import torch.nn as nn
+import torch.optim as optim
+
+
+
+class AgentBrain(nn.Module):
+
+    def __init__(self, num_obstacles):
+        super().__init__()
+        self.stack = nn.Sequential(
+            nn.Linear(2 * num_obstacles + 2 + 2 + 1 + 1, 20),
+            nn.ReLU(),
+            nn.Linear(20, 1 + 1 + 1) 
+        )
+
+    def forward(self, x):
+        return self.stack(x)
