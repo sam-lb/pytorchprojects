@@ -1,11 +1,12 @@
 import pygame
 import time
-from math import sin, cos, pi
+from math import sin, cos, pi, exp
 from random import randint
 from model import AgentBrain
 
 
 pygame.init()
+pygame.font.init()
 WIDTH, HEIGHT = 1152, 648
 TITLE = "canon shooter"
 MAX_FPS = 30
@@ -15,6 +16,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption(TITLE)
 pygame.key.set_repeat(100, 50)
 clock = pygame.time.Clock()
+FONT = pygame.font.SysFont("Arial", 20)
 
 
 # vector functions
@@ -86,6 +88,9 @@ def clamp_vector(x, lower, upper):
 
 def random_color():
     return randint(0, 255), randint(0, 255), randint(0, 255)
+
+def sigmoid(x):
+    return 1 / (1 + exp(-x))
 
 
 class Entity:
@@ -218,15 +223,20 @@ class Simulation:
         self.population_size = population_size
         self.mutation_rate = mutation_rate
         self.generations = generations
-        self.generation_length = 30 # roughly 30 second generations
+        self.generation_length = 10 # seconds
         self.generation = 1
+
+        self.obstacle_positions = []
+        for obstacle in self.obstacles:
+            self.obstacle_positions.append(obstacle.position[0] / self.width)
+            self.obstacle_positions.append(obstacle.position[1] / self.height)
 
         self.initialize_population()
 
     def initialize_population(self):
         for _ in range(self.population_size):
             agent = Agent(
-                (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT
+                (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT, self.mutation_rate
             )
             self.agents.append(agent)
             self.canons.append(agent.canon)
@@ -238,17 +248,33 @@ class Simulation:
             obstacle.draw()
         self.target.draw()
 
-    def crossover(self, agent1, agent2):
-        pass
-
-    def mutate(self, agent):
-        pass
+        screen.blit(FONT.render("Generation: {}".format(self.generation), False, (0, 0, 0)), (10, 10))
 
     def new_generation(self):
+        self.agents.sort(key=lambda agent: agent.evaluate_fitness(self))
+        best_individual = self.agents[-1]
+        print("best individual fitness: {}".format(best_individual.evaluate_fitness(self)))
+        best_individual.brain.save("best_brain.pth")
+
         self.generation += 1
-        print(self.generation)
+        print("now running generation {}".format(self.generation))
+
+        new_agents = []
+        survivors = self.agents[:self.population_size // 2]
+
+        for i in range(0, len(survivors) - 1):
+            new_agents.extend(survivors[i].crossover(survivors[i+1]))
+
+        self.agents = new_agents
+
+        self.canons = []
+        for agent in new_agents:
+            self.canons.append(agent.canon)
+
 
     def update(self):
+        for agent in self.agents:
+            agent.act(self)
         for canon in self.canons:
             canon.update(self.gravity, self.dt, self.obstacles)
         self.draw()
@@ -286,34 +312,71 @@ class Simulation:
 
 class Agent:
 
-    def __init__(self, position, radius, color, angle, num_obstacles):
+    def __init__(self, position, radius, color, angle, num_obstacles, mutation_rate, make_brain=True):
         self.canon = Canon(position, radius, color, angle, (100, 100, 100))
-        self.brain = AgentBrain(num_obstacles)
+        if make_brain: self.brain = AgentBrain(num_obstacles, mutation_rate)
         self.projectiles_fired = 0
+        self.closest_distance = distance((0, HEIGHT), (WIDTH, 0))
+        self.hit_target = False
 
     def evaluate_fitness(self, simulation):
-        if (self.canon.projectile is None):
-            distance_to_target = distance(simulation.target.position, self.canon.position)
-            target_bonus = 0
-        else:
-            distance_to_target = distance(simulation.target.position, self.canon.projectile.position)
-            if circle_intersect(
-                self.canon.projectile.position, self.canon.projectile.radius,
-                simulation.target.position, simulation.target.radius
-            ):
-                target_bonus = 10_000
-            else:
-                target_bonus = 0
-        
+        distance_to_target = self.closest_distance
+        target_bonus = 10_000 if self.hit_target else 0
         projectile_penalty = self.projectiles_fired
 
         fitness = target_bonus - distance_to_target - projectile_penalty
         return fitness
+    
+    def act(self, simulation):
+        inputs = []
+        inputs.extend(simulation.obstacle_positions)
+        inputs.append(simulation.target.position[0] / simulation.width)
+        inputs.append(simulation.target.position[1] / simulation.height)
+        inputs.append(self.canon.position[0] / simulation.width)
+        inputs.append(self.canon.position[1] / simulation.height)
+        inputs.append((self.canon.angle % (2 * pi)) / (2 * pi))
+        inputs.append(sigmoid(self.canon.propulsion))
+
+        if not (self.canon.projectile is None):
+            self.closest_distance = min(distance(self.canon.projectile.position, simulation.target.position),
+                                        self.closest_distance)
+            if (circle_intersect(self.canon.projectile.position,
+                                 self.canon.projectile.radius,
+                                 simulation.target.position,
+                                 simulation.target.radius)):
+                self.hit_target = True
+
+        actions = self.brain.decide(inputs)
+
+        if actions[0] > 0:
+            print("fire!")
+            self.canon.fire()
+            self.projectiles_fired += 1
+        
+        if actions[1] > 0:
+            print("rotate!")
+            self.canon.angle += float(actions[2])
+
+        # if actions[3] > 0:
+        #     self.canon.propulsion += actions[4]
+
+    def crossover(self, other):
+        child1, child2 = (
+            Agent(self.canon.position, self.canon.radius, self.canon.color,
+                  pi / 4, self.brain.num_obstacles, self.brain.mutation_rate, False),
+            Agent(self.canon.position, self.canon.radius, self.canon.color,
+                  pi / 4, self.brain.num_obstacles, self.brain.mutation_rate, False),
+        )
+
+        brain1, brain2 = self.brain.crossover(other.brain)
+        child1.brain = brain1
+        child2.brain = brain2
+        return child1, child2
 
 
 
 obstacles = []
-OBSTACLE_COUNT = 25
+OBSTACLE_COUNT = 5
 OBSTACLE_RADIUS = 40
 OBSTACLE_COLOR = (100, 255, 100)
 
