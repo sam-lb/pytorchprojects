@@ -1,6 +1,8 @@
 import pygame
 from math import sin, cos, pi
 from random import randint
+from model import AgentBrain
+
 
 pygame.init()
 WIDTH, HEIGHT = 1152, 648
