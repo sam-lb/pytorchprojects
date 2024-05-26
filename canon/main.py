@@ -249,6 +249,11 @@ class Agent:
         self.canon = Canon(position, radius, color, angle, (100, 100, 100))
         self.brain = AgentBrain(num_obstacles)
 
+    def evaluate_fitness(self, simulation):
+        pass
+
+    
+
 
 obstacles = []
 OBSTACLE_COUNT = 25

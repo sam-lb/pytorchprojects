@@ -35,10 +35,13 @@ class AgentBrain(nn.Module):
 
     def __init__(self, num_obstacles):
         super().__init__()
+
+        self.linear1 = nn.Linear(2 * num_obstacles + 2 + 2 + 1 + 1, 20)
+        self.linear2 = nn.Linear(20, 1 + 1 + 1)
         self.stack = nn.Sequential(
-            nn.Linear(2 * num_obstacles + 2 + 2 + 1 + 1, 20),
+            self.linear1,
             nn.ReLU(),
-            nn.Linear(20, 1 + 1 + 1) 
+            self.linear2,
         )
 
     def forward(self, x):
