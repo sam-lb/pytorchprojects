@@ -10,12 +10,13 @@ TITLE = "canon shooter"
 MAX_FPS = 30
 BACKGROUND_COLOR = (255, 255, 255)
 
-# screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption(TITLE)
 pygame.key.set_repeat(100, 50)
 clock = pygame.time.Clock()
 
+
+# vector functions
 
 def scale(x, k):
     return (
@@ -73,6 +74,11 @@ def clamp_vector(x, lower, upper):
         x[0] / norm_x * new_norm,
         x[1] / norm_x * new_norm,
     )
+
+# misc
+
+def random_color():
+    return randint(0, 255), randint(0, 255), randint(0, 255)
 
 
 class Entity:
@@ -192,8 +198,8 @@ class Target(Entity):
 
 class Simulation:
 
-    def __init__(self, canon, obstacles, target, width, height):
-        self.canon = canon
+    def __init__(self, obstacles, target, width, height):
+        self.canons = []
         self.obstacles = obstacles
         self.target = target
         self.running = False
@@ -201,14 +207,19 @@ class Simulation:
         self.gravity = (0, 35)
         self.dt = 1 / MAX_FPS
 
+    def add_canon(self, canon):
+        self.canons.append(canon)
+
     def draw(self):
-        self.canon.draw()
+        for canon in self.canons:
+            canon.draw()
         for obstacle in self.obstacles:
             obstacle.draw()
         self.target.draw()
 
     def update(self):
-        self.canon.update(self.gravity, self.dt, self.obstacles)
+        for canon in self.canons:
+            canon.update(self.gravity, self.dt, self.obstacles)
         self.draw()
 
     def run(self, screen):
@@ -229,16 +240,20 @@ class Simulation:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
                         break
-                    elif event.key == pygame.K_SPACE:
-                        simulation.canon.fire()
-                    elif event.key == pygame.K_LEFT:
-                        simulation.canon.angle += 0.1
-                    elif event.key == pygame.K_RIGHT:
-                        simulation.canon.angle -= 0.1
-                # elif event.type == pygame.VIDEORESIZE:
-                #     self.width, self.height = event.w, event.h
-                #     screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+                    # elif event.key == pygame.K_SPACE:
+                    #     self.canon.fire()
+                    # elif event.key == pygame.K_LEFT:
+                    #     self.canon.angle += 0.1
+                    # elif event.key == pygame.K_RIGHT:
+                    #     self.canon.angle -= 0.1
         pygame.quit()
+
+
+class Agent:
+
+    def __init__(self, position, radius, color, angle, num_obstacles):
+        self.canon = Canon(position, radius, color, angle, (100, 100, 100))
+        self.brain = AgentBrain(num_obstacles)
 
 
 obstacles = []
@@ -258,9 +273,9 @@ for i in range(OBSTACLE_COUNT):
             space_found = True
     obstacles.append(Obstacle((x, y), OBSTACLE_RADIUS, OBSTACLE_COLOR))
 
-canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
+# canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
-simulation = Simulation(canon, obstacles, target, WIDTH, HEIGHT)
+simulation = Simulation(obstacles, target, WIDTH, HEIGHT)
 
 
 # GA stuff
@@ -269,8 +284,13 @@ population_size = 20
 mutation_rate = 0.05
 generations = 5
 
-def evaluate_fitness(agent, simulation):
-    pass
+agents = []
+for i in range(population_size):
+    agent = Agent(
+        (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT
+    )
+    agents.append(agent)
+    simulation.add_canon(agent.canon)
 
 
 # run simulation
