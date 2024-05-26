@@ -198,8 +198,9 @@ class Target(Entity):
 
 class Simulation:
 
-    def __init__(self, obstacles, target, width, height):
+    def __init__(self, obstacles, target, width, height, population_size, mutation_rate, generations):
         self.canons = []
+        self.agents = []
         self.obstacles = obstacles
         self.target = target
         self.running = False
@@ -207,8 +208,19 @@ class Simulation:
         self.gravity = (0, 35)
         self.dt = 1 / MAX_FPS
 
-    def add_canon(self, canon):
-        self.canons.append(canon)
+        self.population_size = population_size
+        self.mutation_rate = mutation_rate
+        self.generations = generations
+
+        self.initialize_population()
+
+    def initialize_population(self):
+        for _ in range(self.population_size):
+            agent = Agent(
+                (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT
+            )
+            self.agents.append(agent)
+            self.canons.append(agent.canon)
 
     def draw(self):
         for canon in self.canons:
@@ -224,6 +236,7 @@ class Simulation:
 
     def run(self, screen):
         self.running = True
+
         while self.running:
             screen.fill(BACKGROUND_COLOR)
 
@@ -252,13 +265,18 @@ class Agent:
     def evaluate_fitness(self, simulation):
         pass
 
-    
+
 
 
 obstacles = []
 OBSTACLE_COUNT = 25
 OBSTACLE_RADIUS = 40
 OBSTACLE_COLOR = (100, 255, 100)
+
+POPULATION_SIZE = 20
+MUTATION_RATE = 0.05
+GENERATIONS = 5
+
 for i in range(OBSTACLE_COUNT):
     space_found = False
     x, y = 0, 0
@@ -274,22 +292,7 @@ for i in range(OBSTACLE_COUNT):
 
 # canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
-simulation = Simulation(obstacles, target, WIDTH, HEIGHT)
-
-
-# GA stuff
-
-population_size = 20
-mutation_rate = 0.05
-generations = 5
-
-agents = []
-for i in range(population_size):
-    agent = Agent(
-        (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT
-    )
-    agents.append(agent)
-    simulation.add_canon(agent.canon)
+simulation = Simulation(obstacles, target, WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS)
 
 
 # run simulation
