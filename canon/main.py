@@ -240,12 +240,6 @@ class Simulation:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
                         break
-                    # elif event.key == pygame.K_SPACE:
-                    #     self.canon.fire()
-                    # elif event.key == pygame.K_LEFT:
-                    #     self.canon.angle += 0.1
-                    # elif event.key == pygame.K_RIGHT:
-                    #     self.canon.angle -= 0.1
         pygame.quit()
 
 
