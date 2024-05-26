@@ -1,4 +1,5 @@
 import pygame
+import time
 from math import sin, cos, pi
 from random import randint
 from model import AgentBrain
@@ -211,6 +212,8 @@ class Simulation:
         self.population_size = population_size
         self.mutation_rate = mutation_rate
         self.generations = generations
+        self.generation_length = 30 # roughly 30 second generations
+        self.generation = 1
 
         self.initialize_population()
 
@@ -229,6 +232,16 @@ class Simulation:
             obstacle.draw()
         self.target.draw()
 
+    def crossover(self, agent1, agent2):
+        pass
+
+    def mutate(self, agent):
+        pass
+
+    def new_generation(self):
+        self.generation += 1
+        print(self.generation)
+
     def update(self):
         for canon in self.canons:
             canon.update(self.gravity, self.dt, self.obstacles)
@@ -236,6 +249,8 @@ class Simulation:
 
     def run(self, screen):
         self.running = True
+        timer = 0
+        last_time = time.time()
 
         while self.running:
             screen.fill(BACKGROUND_COLOR)
@@ -244,6 +259,13 @@ class Simulation:
 
             pygame.display.flip()
             clock.tick(MAX_FPS)
+            new_time = time.time()
+            timer += new_time - last_time
+            last_time = new_time
+
+            if timer >= self.generation_length:
+                self.new_generation()
+                timer = 0
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
