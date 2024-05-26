@@ -260,4 +260,17 @@ canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
 simulation = Simulation(canon, obstacles, target, WIDTH, HEIGHT)
 
+
+# GA stuff
+
+population_size = 20
+mutation_rate = 0.05
+generations = 5
+
+def evaluate_fitness(agent, simulation):
+    pass
+
+
+# run simulation
+
 simulation.run(screen)
