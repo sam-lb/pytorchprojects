@@ -240,7 +240,7 @@ class Simulation:
 
 
 obstacles = []
-OBSTACLE_COUNT = 15
+OBSTACLE_COUNT = 25
 OBSTACLE_RADIUS = 40
 OBSTACLE_COLOR = (100, 255, 100)
 for i in range(OBSTACLE_COUNT):
