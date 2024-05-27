@@ -3,6 +3,8 @@ import time
 from math import sin, cos, pi, exp
 from random import randint
 from model import AgentBrain
+from torch import load
+from copy import deepcopy
 
 
 pygame.init()
@@ -119,15 +121,15 @@ class Projectile(Entity):
             self.velocity[1] + dt * acceleration[1],
         ), 0, 100)
         self.position = (
-            clamp(self.position[0] + dt * self.velocity[0], self.radius, simulation.width - self.radius),
-            clamp(self.position[1] + dt * self.velocity[1], self.radius, simulation.height - self.radius),
+            clamp(self.position[0] + dt * self.velocity[0], self.radius, WIDTH - self.radius),
+            clamp(self.position[1] + dt * self.velocity[1], self.radius, HEIGHT - self.radius),
         )
 
         for obstacle in obstacles:
             if circle_intersect(self.position, self.radius, obstacle.position, obstacle.radius):
                 self.resolve_collision(obstacle, dt)
 
-        if self.position[1] == simulation.height - self.radius:
+        if self.position[1] == HEIGHT - self.radius:
             # projectile is on the ground
             self.velocity = (
                 self.velocity[0],
@@ -210,10 +212,14 @@ class Target(Entity):
 
 class Simulation:
 
-    def __init__(self, obstacles, target, width, height, population_size, mutation_rate, generations, load_model=False):
+    def __init__(self, target, width, height, population_size, mutation_rate, generations,
+                 obstacle_count, obstacle_radius, obstacle_color, load_model=False, save_best=False):
         self.canons = []
         self.agents = []
-        self.obstacles = obstacles
+        self.obstacles = []
+        self.obstacle_count = obstacle_count
+        self.obstacle_radius = obstacle_radius
+        self.obstacle_color = obstacle_color
         self.target = target
         self.running = False
         self.width, self.height = width, height
@@ -223,35 +229,69 @@ class Simulation:
         self.population_size = population_size
         self.mutation_rate = mutation_rate
         self.generations = generations
-        self.generation_length = 20 # seconds
+        self.generation_length = 300 # frames
         self.generation = 1
         self.best_fitness = None
 
+        self.drawing = True
+
+        self.initialize_obstacles()
         self.obstacle_positions = []
         for obstacle in self.obstacles:
             self.obstacle_positions.append(obstacle.position[0] / self.width)
             self.obstacle_positions.append(obstacle.position[1] / self.height)
 
         self.load_model = load_model
+        self.save_best = save_best
         self.initialize_population()
 
+    def initialize_obstacles(self):
+        for _ in range(self.obstacle_count):
+            space_found = False
+            x, y = 0, 0
+            while (not space_found):
+                x = randint(self.obstacle_radius, self.width - self.obstacle_radius)
+                y = randint(self.obstacle_radius, self.height - self.obstacle_radius)
+                for obstacle in self.obstacles:
+                    if circle_intersect((x, y), self.obstacle_radius, obstacle.position, self.obstacle_radius):
+                        break
+                else:
+                    space_found = distance_sq((x, y), (0, self.height)) > 40000 # 200 pixel buffer
+            self.obstacles.append(Obstacle((x, y), self.obstacle_radius, self.obstacle_color))
+
     def initialize_population(self):
-        for _ in range(self.population_size):
-            agent = Agent(
-                (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT, self.mutation_rate
-            )
-            self.agents.append(agent)
-            self.canons.append(agent.canon)
+        if (self.load_model):
+            loaded_brain = load("best_brain.pth")
+            for _ in range(self.population_size):
+                agent = Agent(
+                    (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT, self.mutation_rate, False
+                )
+                agent.brain = deepcopy(loaded_brain)
+                self.agents.append(agent)
+                self.canons.append(agent.canon)
+                loaded_brain.mutate()
+        else:
+            for _ in range(self.population_size):
+                agent = Agent(
+                    (50, HEIGHT - 25), 25, random_color(), pi / 4, OBSTACLE_COUNT, self.mutation_rate
+                )
+                self.agents.append(agent)
+                self.canons.append(agent.canon)
+
+    def toggle_drawing(self):
+        self.drawing = not self.drawing
 
     def draw(self):
-        for canon in self.canons:
-            canon.draw()
-        for obstacle in self.obstacles:
-            obstacle.draw()
-        self.target.draw()
+        if self.drawing:
+            for canon in self.canons:
+                canon.draw()
+            for obstacle in self.obstacles:
+                obstacle.draw()
+            self.target.draw()
 
-        screen.blit(FONT.render("Generation: {}".format(self.generation), False, (0, 0, 0)), (10, 10))
-        screen.blit(FONT.render("Best fitness: {}".format(self.best_fitness), False, (0, 0, 0)), (10, 50))
+            screen.blit(FONT.render("Generation: {}".format(self.generation), False, (0, 0, 0)), (10, 10))
+            screen.blit(FONT.render("Best fitness: {}".format(self.best_fitness), False, (0, 0, 0)), (10, 50))
+            screen.blit(FONT.render("FPS: {}".format(int(clock.get_fps())), False, (0, 0, 0)), (10, 90))
 
     def new_generation(self):
         self.agents.sort(key=lambda agent: agent.evaluate_fitness())
@@ -259,11 +299,12 @@ class Simulation:
         best_fitness = best_individual.evaluate_fitness()
         print("best individual fitness: {}".format(best_fitness))
         if (self.best_fitness is None or best_fitness > self.best_fitness):
-            best_individual.brain.save("best_brain.pth")
+            if (self.save_best): best_individual.brain.save("best_brain.pth")
             self.best_fitness = best_fitness
 
         self.generation += 1
         print("now running generation {}".format(self.generation))
+        print("avg fps: {}".format(clock.get_fps()))
 
         new_agents = []
         survivors = self.agents[self.population_size // 2:]
@@ -298,23 +339,20 @@ class Simulation:
 
     def run(self, screen):
         self.running = True
-        timer = 0
-        last_time = time.time()
+        frames = 0
 
         while self.running:
-            screen.fill(BACKGROUND_COLOR)
+            if self.drawing: screen.fill(BACKGROUND_COLOR)
 
             self.update()
 
-            pygame.display.flip()
-            clock.tick(MAX_FPS)
-            new_time = time.time()
-            timer += new_time - last_time
-            last_time = new_time
+            if self.drawing: pygame.display.flip()
+            clock.tick() # No fps limit
+            frames += 1
 
-            if timer >= self.generation_length:
+            if frames >= self.generation_length:
                 self.new_generation()
-                timer = 0
+                frames = 0
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -324,6 +362,8 @@ class Simulation:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
                         break
+                    elif event.key == pygame.K_SPACE:
+                        self.toggle_drawing()
         pygame.quit()
 
 
@@ -399,7 +439,6 @@ class Agent:
 
 
 
-obstacles = []
 OBSTACLE_COUNT = 5
 OBSTACLE_RADIUS = 40
 OBSTACLE_COLOR = (100, 255, 100)
@@ -408,22 +447,9 @@ POPULATION_SIZE = 100
 MUTATION_RATE = 0.05
 GENERATIONS = 5
 
-for i in range(OBSTACLE_COUNT):
-    space_found = False
-    x, y = 0, 0
-    while (not space_found):
-        x = randint(OBSTACLE_RADIUS, WIDTH - OBSTACLE_RADIUS)
-        y = randint(OBSTACLE_RADIUS, HEIGHT - OBSTACLE_RADIUS)
-        for obstacle in obstacles:
-            if circle_intersect((x, y), OBSTACLE_RADIUS, obstacle.position, OBSTACLE_RADIUS):
-                break
-        else:
-            space_found = distance_sq((x, y), (0, HEIGHT)) > 40000 # 200 pixel buffer
-    obstacles.append(Obstacle((x, y), OBSTACLE_RADIUS, OBSTACLE_COLOR))
-
-# canon = Canon((50, HEIGHT - 25), 25, (255, 0, 0), pi / 4, (100, 100, 100))
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
-simulation = Simulation(obstacles, target, WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS)
+simulation = Simulation(target, WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS,
+                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, True, False)
 
 
 # run simulation
