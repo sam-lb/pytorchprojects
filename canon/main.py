@@ -210,7 +210,7 @@ class Target(Entity):
 
 class Simulation:
 
-    def __init__(self, obstacles, target, width, height, population_size, mutation_rate, generations):
+    def __init__(self, obstacles, target, width, height, population_size, mutation_rate, generations, load_model=False):
         self.canons = []
         self.agents = []
         self.obstacles = obstacles
@@ -223,14 +223,16 @@ class Simulation:
         self.population_size = population_size
         self.mutation_rate = mutation_rate
         self.generations = generations
-        self.generation_length = 10 # seconds
+        self.generation_length = 20 # seconds
         self.generation = 1
+        self.best_fitness = None
 
         self.obstacle_positions = []
         for obstacle in self.obstacles:
             self.obstacle_positions.append(obstacle.position[0] / self.width)
             self.obstacle_positions.append(obstacle.position[1] / self.height)
 
+        self.load_model = load_model
         self.initialize_population()
 
     def initialize_population(self):
@@ -249,27 +251,42 @@ class Simulation:
         self.target.draw()
 
         screen.blit(FONT.render("Generation: {}".format(self.generation), False, (0, 0, 0)), (10, 10))
+        screen.blit(FONT.render("Best fitness: {}".format(self.best_fitness), False, (0, 0, 0)), (10, 50))
 
     def new_generation(self):
         self.agents.sort(key=lambda agent: agent.evaluate_fitness(self))
         best_individual = self.agents[-1]
-        print("best individual fitness: {}".format(best_individual.evaluate_fitness(self)))
-        best_individual.brain.save("best_brain.pth")
+        best_fitness = best_individual.evaluate_fitness(self)
+        print("best individual fitness: {}".format(best_fitness))
+        if (self.best_fitness is None or best_fitness > self.best_fitness):
+            best_individual.brain.save("best_brain.pth")
+            self.best_fitness = best_fitness
 
         self.generation += 1
         print("now running generation {}".format(self.generation))
 
         new_agents = []
-        survivors = self.agents[:self.population_size // 2]
+        survivors = self.agents[self.population_size // 2:]
+        for agent in survivors:
+            new_agents.append(Agent(
+                agent.canon.position, agent.canon.radius, agent.canon.color, pi / 4,
+                agent.brain.num_obstacles, agent.brain.mutation_rate, False
+            ))
+            new_agents[-1].brain = agent.brain
+        print(len(self.agents), len(survivors))
 
         for i in range(0, len(survivors) - 1):
-            new_agents.extend(survivors[i].crossover(survivors[i+1]))
+            # new_agents.extend(survivors[i].crossover(survivors[i+1]))
+            new_agents.append(survivors[i].crossover(survivors[i+1])[0])
+        new_agents.append(survivors[0].crossover(survivors[-1])[0])
 
         self.agents = new_agents
 
+        print(len(self.canons), "before")
         self.canons = []
         for agent in new_agents:
             self.canons.append(agent.canon)
+        print(len(self.canons), "after")
 
 
     def update(self):
@@ -316,15 +333,16 @@ class Agent:
         self.canon = Canon(position, radius, color, angle, (100, 100, 100))
         if make_brain: self.brain = AgentBrain(num_obstacles, mutation_rate)
         self.projectiles_fired = 0
-        self.closest_distance = distance((0, HEIGHT), (WIDTH, 0))
+        self.max_distance = distance((0, HEIGHT), (WIDTH, 0))
+        self.closest_distance = self.max_distance
         self.hit_target = False
 
     def evaluate_fitness(self, simulation):
-        distance_to_target = self.closest_distance
+        distance_to_target = self.max_distance - self.closest_distance
         target_bonus = 10_000 if self.hit_target else 0
         projectile_penalty = self.projectiles_fired
 
-        fitness = target_bonus - distance_to_target - projectile_penalty
+        fitness = target_bonus + distance_to_target - projectile_penalty
         return fitness
     
     def act(self, simulation):
@@ -349,12 +367,10 @@ class Agent:
         actions = self.brain.decide(inputs)
 
         if actions[0] > 0:
-            print("fire!")
             self.canon.fire()
             self.projectiles_fired += 1
         
         if actions[1] > 0:
-            print("rotate!")
             self.canon.angle += float(actions[2])
 
         # if actions[3] > 0:
@@ -367,11 +383,19 @@ class Agent:
             Agent(self.canon.position, self.canon.radius, self.canon.color,
                   pi / 4, self.brain.num_obstacles, self.brain.mutation_rate, False),
         )
+        # child1 = Agent(self.canon.position, self.canon.radius, self.canon.color,
+        #           pi / 4, self.brain.num_obstacles, self.brain.mutation_rate, False)
 
         brain1, brain2 = self.brain.crossover(other.brain)
         child1.brain = brain1
         child2.brain = brain2
+        
+        # survivor = Agent(self.canon.position, self.canon.radius, self.canon.color, pi / 4,
+        #              self.brain.num_obstacles, self.brain.mutation_rate, False)
+        # survivor.brain = self.brain
+
         return child1, child2
+        # return survivor, child1
 
 
 
@@ -380,7 +404,7 @@ OBSTACLE_COUNT = 5
 OBSTACLE_RADIUS = 40
 OBSTACLE_COLOR = (100, 255, 100)
 
-POPULATION_SIZE = 20
+POPULATION_SIZE = 100
 MUTATION_RATE = 0.05
 GENERATIONS = 5
 
