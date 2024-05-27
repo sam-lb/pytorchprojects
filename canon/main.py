@@ -212,7 +212,7 @@ class Target(Entity):
 
 class Simulation:
 
-    def __init__(self, target, width, height, population_size, mutation_rate, generations,
+    def __init__(self, width, height, population_size, mutation_rate, generations,
                  obstacle_count, obstacle_radius, obstacle_color, load_model=False, save_best=False):
         self.canons = []
         self.agents = []
@@ -220,9 +220,9 @@ class Simulation:
         self.obstacle_count = obstacle_count
         self.obstacle_radius = obstacle_radius
         self.obstacle_color = obstacle_color
+        self.width, self.height = width, height
         self.initialize_target()
         self.running = False
-        self.width, self.height = width, height
         self.gravity = (0, 35)
         self.dt = 1 / MAX_FPS
 
@@ -428,7 +428,7 @@ class Agent:
             self.canon.angle += float(actions[2])
 
         if actions[3] > 0:
-            self.canon.propulsion = clamp(self.canon.propulsion + float(actions[4]), 0, 300)
+            self.canon.propulsion = clamp(self.canon.propulsion + 10 * float(actions[4]), 0, 300)
 
     def crossover(self, other):
         child1, child2 = (
@@ -462,7 +462,7 @@ MUTATION_RATE = 0.05
 GENERATIONS = 5
 
 simulation = Simulation(WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS,
-                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, True, False)
+                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, False, False)
 
 
 # run simulation
