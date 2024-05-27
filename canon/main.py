@@ -220,7 +220,7 @@ class Simulation:
         self.obstacle_count = obstacle_count
         self.obstacle_radius = obstacle_radius
         self.obstacle_color = obstacle_color
-        self.target = target
+        self.initialize_target()
         self.running = False
         self.width, self.height = width, height
         self.gravity = (0, 35)
@@ -233,6 +233,10 @@ class Simulation:
         self.generation = 1
         self.best_fitness = None
 
+        self.reset_obstacle_interval = 5
+        self.reset_target_interval = 8
+        self.interval_decay_factor = 1.5
+
         self.drawing = True
 
         self.initialize_obstacles()
@@ -244,6 +248,9 @@ class Simulation:
         self.load_model = load_model
         self.save_best = save_best
         self.initialize_population()
+
+    def initialize_target(self):
+        self.target = Target((randint(20, self.width - 20), 50), 20, (100, 100, 255))
 
     def initialize_obstacles(self):
         self.obstacles = []
@@ -304,8 +311,12 @@ class Simulation:
             self.best_fitness = best_fitness
 
         self.generation += 1
-        if self.generation % 5 == 0:
-                self.initialize_obstacles()
+        if self.generation % self.reset_obstacle_interval == 0:
+            self.initialize_obstacles()
+            self.reset_obstacle_interval = int(self.reset_obstacle_interval * self.interval_decay_factor)
+        if self.generation % self.reset_target_interval == 0:
+            self.initialize_target()
+            self.reset_target_interval = int(self.reset_obstacle_interval * self.interval_decay_factor)
         print("now running generation {}".format(self.generation))
         print("avg fps: {}".format(clock.get_fps()))
 
@@ -450,9 +461,8 @@ POPULATION_SIZE = 100
 MUTATION_RATE = 0.05
 GENERATIONS = 5
 
-target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
-simulation = Simulation(target, WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS,
-                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, False, True)
+simulation = Simulation(WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS,
+                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, True, False)
 
 
 # run simulation
