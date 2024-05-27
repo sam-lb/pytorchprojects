@@ -304,7 +304,7 @@ class Simulation:
             self.best_fitness = best_fitness
 
         self.generation += 1
-        if self.generation % 50 == 0:
+        if self.generation % 5 == 0:
                 self.initialize_obstacles()
         print("now running generation {}".format(self.generation))
         print("avg fps: {}".format(clock.get_fps()))
@@ -396,7 +396,7 @@ class Agent:
         inputs.append(self.canon.position[0] / simulation.width)
         inputs.append(self.canon.position[1] / simulation.height)
         inputs.append((self.canon.angle % (2 * pi)) / (2 * pi))
-        inputs.append(sigmoid(self.canon.propulsion))
+        inputs.append(sigmoid(self.canon.propulsion / 100))
 
         if not (self.canon.projectile is None):
             self.closest_distance = min(distance(self.canon.projectile.position, simulation.target.position),
@@ -416,8 +416,8 @@ class Agent:
         if actions[1] > 0:
             self.canon.angle += float(actions[2])
 
-        # if actions[3] > 0:
-        #     self.canon.propulsion += actions[4]
+        if actions[3] > 0:
+            self.canon.propulsion = clamp(self.canon.propulsion + float(actions[4]), 0, 300)
 
     def crossover(self, other):
         child1, child2 = (
@@ -452,7 +452,7 @@ GENERATIONS = 5
 
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
 simulation = Simulation(target, WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS,
-                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, True, True)
+                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, False, True)
 
 
 # run simulation
