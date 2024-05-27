@@ -246,6 +246,7 @@ class Simulation:
         self.initialize_population()
 
     def initialize_obstacles(self):
+        self.obstacles = []
         for _ in range(self.obstacle_count):
             space_found = False
             x, y = 0, 0
@@ -303,6 +304,8 @@ class Simulation:
             self.best_fitness = best_fitness
 
         self.generation += 1
+        if self.generation % 50 == 0:
+                self.initialize_obstacles()
         print("now running generation {}".format(self.generation))
         print("avg fps: {}".format(clock.get_fps()))
 
@@ -449,7 +452,7 @@ GENERATIONS = 5
 
 target = Target((WIDTH - 50, 50), 20, (100, 100, 255))
 simulation = Simulation(target, WIDTH, HEIGHT, POPULATION_SIZE, MUTATION_RATE, GENERATIONS,
-                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, True, False)
+                        OBSTACLE_COUNT, OBSTACLE_RADIUS, OBSTACLE_COLOR, True, True)
 
 
 # run simulation
