@@ -254,9 +254,9 @@ class Simulation:
         screen.blit(FONT.render("Best fitness: {}".format(self.best_fitness), False, (0, 0, 0)), (10, 50))
 
     def new_generation(self):
-        self.agents.sort(key=lambda agent: agent.evaluate_fitness(self))
+        self.agents.sort(key=lambda agent: agent.evaluate_fitness())
         best_individual = self.agents[-1]
-        best_fitness = best_individual.evaluate_fitness(self)
+        best_fitness = best_individual.evaluate_fitness()
         print("best individual fitness: {}".format(best_fitness))
         if (self.best_fitness is None or best_fitness > self.best_fitness):
             best_individual.brain.save("best_brain.pth")
@@ -337,7 +337,7 @@ class Agent:
         self.closest_distance = self.max_distance
         self.hit_target = False
 
-    def evaluate_fitness(self, simulation):
+    def evaluate_fitness(self):
         distance_to_target = self.max_distance - self.closest_distance
         target_bonus = 10_000 if self.hit_target else 0
         projectile_penalty = self.projectiles_fired
